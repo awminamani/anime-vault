@@ -1,0 +1,23 @@
+{
+  "name": "anime-vault",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AnimeVault — discover trending anime, watch trailers, search 20,000+ titles. AniList + Jikan.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "15.5.23",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.2"
+  }
+}
