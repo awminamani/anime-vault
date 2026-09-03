@@ -284,10 +284,10 @@ export default function Site({ trending, genres }: Props) {
       <div className="cursor-glow" id="cursorGlow" aria-hidden="true" />
 
       <header className={scrolled ? "nav scrolled" : "nav"}>
-        <a className="brand" href="#top" aria-label="AnimeVault home">
+        <a className="brand" href="#top" aria-label="Kitsune home">
           <LogoMark />
           <span>
-            Anime<b>Vault</b>
+            Kit<b>sune</b>
           </span>
         </a>
         <nav className="anchors" aria-label="Sections">

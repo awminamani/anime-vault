@@ -2,7 +2,7 @@
   "name": "anime-vault",
   "version": "1.0.0",
   "private": true,
-  "description": "AnimeVault — discover trending anime, watch trailers, search 20,000+ titles. AniList + Jikan.",
+  "description": "Kitsune — discover trending anime, watch trailers, search 20,000+ titles.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

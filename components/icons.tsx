@@ -33,25 +33,15 @@ export function PlayIcon({ size = 17 }: { size?: number }) {
 
 export function LogoMark({ size = 30 }: { size?: number }) {
   return (
-    <svg
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/kitsune.png"
+      alt=""
       width={size}
       height={size}
-      viewBox="0 0 32 32"
       aria-hidden="true"
       className="brand-mark"
-    >
-      <defs>
-        <linearGradient id="av-g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#8b5cf6" />
-          <stop offset="1" stopColor="#06b6d4" />
-        </linearGradient>
-      </defs>
-      <rect width="32" height="32" rx="8" fill="url(#av-g)" />
-      <path
-        d="M16 6l2.6 6.9L26 14l-6.6 1.5L16 22l-3.4-6.5L6 14l7.4-1.1z"
-        fill="#fff"
-      />
-    </svg>
+    />
   );
 }
 

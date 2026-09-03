@@ -1,4 +1,4 @@
-# AnimeVault
+# Kitsune
 
 Discover your next obsession — trending anime, top movies, trailers in one click.
 

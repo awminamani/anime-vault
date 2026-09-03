@@ -1,4 +1,4 @@
-/* AnimeVault v3 — airy, mobile-first, single page.
+/* Kitsune — airy, mobile-first, single page.
    Motion: GPU-only transforms/opacity; no scroll-linked opacity on cards. */
 
 :root {
@@ -60,7 +60,7 @@ img { display: block; max-width: 100%; }
 }
 .brand { display: flex; align-items: center; gap: 9px; font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; }
 .brand b { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.brand-mark { width: 28px; height: 28px; }
+.brand-mark { width: 30px; height: 30px; border-radius: 9px; object-fit: cover; }
 .anchors { display: flex; gap: 4px; margin: 0 auto; }
 .anchors a {
   font-size: 0.86rem; font-weight: 600; color: var(--muted);
