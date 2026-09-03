@@ -128,6 +128,18 @@ export default function Site({ trending, genres }: Props) {
     }
   };
 
+  const clearQuery = useCallback(() => {
+    setQ("");
+    if (debounce.current) clearTimeout(debounce.current);
+    if (!wantsSearch("", filters)) {
+      setResults([]);
+      setSearchMore(false);
+      setSearching(false);
+    } else {
+      runSearch("", filters, 1, false);
+    }
+  }, [filters, runSearch]);
+
   const showResults = wantsSearch(q, filters);
 
   const loadMoreSearch = useCallback(() => {
@@ -232,6 +244,24 @@ export default function Site({ trending, genres }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [adv]);
 
+  // ---- active section highlight (desktop anchors + mobile pill) ----
+  const [active, setActive] = useState("top");
+  useEffect(() => {
+    const secs = ["top", "trending", "explore"]
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => !!el);
+    if (secs.length === 0 || !("IntersectionObserver" in window)) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) setActive(e.target.id);
+        }
+      },
+      { rootMargin: "-38% 0px -55% 0px" }
+    );
+    secs.forEach((s) => io.observe(s));
+    return () => io.disconnect();
+  }, []);
   // ---- nav: transparent over the hero (seamless), glass once scrolled ----
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -261,8 +291,8 @@ export default function Site({ trending, genres }: Props) {
           </span>
         </a>
         <nav className="anchors" aria-label="Sections">
-          <a href="#trending">Trending</a>
-          <a href="#explore">Explore</a>
+          <a href="#trending" className={active === "trending" ? "on" : ""}>Trending</a>
+          <a href="#explore" className={active === "explore" ? "on" : ""}>Explore</a>
         </nav>
         <a
           className="ghlink"
@@ -276,9 +306,9 @@ export default function Site({ trending, genres }: Props) {
         </a>
       </header>
 
-      <main id="top">
+      <main>
         {/* SEARCH CONSOLE */}
-        <section className="console">
+        <section className="console" id="top">
           <Starfield />
           <HeroBg banners={heroBanners} />
           <div className="orbs" aria-hidden="true">
@@ -298,6 +328,11 @@ export default function Site({ trending, genres }: Props) {
                 value={q}
                 onChange={(e) => onType(e.target.value)}
               />
+              {q && (
+                <button className="clearq" onClick={clearQuery} aria-label="Clear search">
+                  ✕
+                </button>
+              )}
               <button
                 className={activeCount(filters) > 0 ? "advbtn has" : "advbtn"}
                 onClick={() => setAdv(true)}
@@ -462,15 +497,15 @@ export default function Site({ trending, genres }: Props) {
 
       {/* mobile bottom nav — anchor jumps on the single page */}
       <nav className="bottomnav" aria-label="Sections">
-        <a className="bnav" href="#top">
+        <a className={active === "top" ? "bnav on" : "bnav"} href="#top">
           <SearchIcon />
           <span>Search</span>
         </a>
-        <a className="bnav" href="#trending">
+        <a className={active === "trending" ? "bnav on" : "bnav"} href="#trending">
           <HomeIcon />
           <span>Trending</span>
         </a>
-        <a className="bnav" href="#explore">
+        <a className={active === "explore" ? "bnav on" : "bnav"} href="#explore">
           <CompassIcon />
           <span>Explore</span>
         </a>
