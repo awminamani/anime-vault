@@ -39,6 +39,7 @@ function toAnime(m: AniMedia): Anime {
     id: `anilist:${m.id}`,
     source: "anilist",
     title,
+    titleRomaji: m.title?.romaji || undefined,
     cover: m.coverImage?.extraLarge || m.coverImage?.large || "",
     banner: m.bannerImage || undefined,
     score: m.averageScore || undefined,
@@ -53,11 +54,16 @@ function toAnime(m: AniMedia): Anime {
   };
 }
 
-async function query(
+interface PageResult {
+  media: AniMedia[];
+  hasNextPage: boolean;
+}
+
+async function fetchPage(
   queryText: string,
   variables: Record<string, unknown>,
   revalidateSeconds = 3600
-): Promise<AniMedia[]> {
+): Promise<PageResult> {
   const body = JSON.stringify({ query: queryText, variables });
   let lastErr: unknown = new Error("AniList unreachable");
   // AniList route from some networks is flaky (first attempt often times
@@ -91,7 +97,10 @@ async function query(
         throw new Error(
           json.errors.map((e: { message: string }) => e.message).join("; ")
         );
-      return json?.data?.Page?.media ?? [];
+      return {
+        media: json?.data?.Page?.media ?? [],
+        hasNextPage: json?.data?.Page?.pageInfo?.hasNextPage ?? false,
+      };
     } catch (err) {
       clearTimeout(timer);
       lastErr = err;
@@ -101,47 +110,122 @@ async function query(
   throw lastErr;
 }
 
-const LIST_QUERY = `
-  query ($perPage: Int, $sort: [MediaSort], $format: MediaFormat) {
-    Page(perPage: $perPage) {
-      media(type: ANIME, sort: $sort, format: $format, isAdult: false) {
-        ${MEDIA_FIELDS}
+const LIST_BASE = `
+  query (__VARDEFS__) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo { hasNextPage }
+      media(__MEDIAARGS__) {
+        __FIELDS__
       }
     }
   }
 `;
 
-export async function getTrending(perPage = 12): Promise<Anime[]> {
-  const media = await query(
-    LIST_QUERY,
-    { perPage, sort: ["TRENDING_DESC", "POPULARITY_DESC"] },
-    1800 // 30 min — trending moves
-  );
-  return media.map(toAnime);
+function buildListQuery(o: {
+  sort?: string[];
+  format?: string;
+  genre?: string;
+  year?: number;
+  status?: string;
+  search?: string;
+}): { text: string; variables: Record<string, unknown> } {
+  // AniList treats explicit null filters as "match nothing" (empty media),
+  // so only declare + send args that are actually set. Root cause of the
+  // all-empty-sections bug.
+  const varDefs = ["$page: Int", "$perPage: Int"];
+  const mediaArgs = ["type: ANIME", "isAdult: false"];
+  const variables: Record<string, unknown> = {};
+  if (o.sort?.length) {
+    varDefs.push("$sort: [MediaSort]");
+    mediaArgs.push("sort: $sort");
+    variables.sort = o.sort;
+  }
+  if (o.format) {
+    varDefs.push("$format: MediaFormat");
+    mediaArgs.push("format: $format");
+    variables.format = o.format;
+  }
+  if (o.genre) {
+    varDefs.push("$genre: String");
+    mediaArgs.push("genre: $genre");
+    variables.genre = o.genre;
+  }
+  if (o.year) {
+    varDefs.push("$year: Int");
+    mediaArgs.push("seasonYear: $year");
+    variables.year = o.year;
+  }
+  if (o.status) {
+    varDefs.push("$status: MediaStatus");
+    mediaArgs.push("status: $status");
+    variables.status = o.status;
+  }
+  if (o.search) {
+    varDefs.push("$q: String");
+    mediaArgs.push("search: $q");
+    variables.q = o.search;
+  }
+  const text = LIST_BASE.replace("__VARDEFS__", varDefs.join(", "))
+    .replace("__MEDIAARGS__", mediaArgs.join(", "))
+    .replace("__FIELDS__", MEDIA_FIELDS);
+  return { text, variables };
 }
 
-export async function getPopular(perPage = 12): Promise<Anime[]> {
-  const media = await query(LIST_QUERY, {
-    perPage,
-    sort: ["POPULARITY_DESC"],
+export interface BrowseOpts {
+  page?: number;
+  perPage?: number;
+  sort?: string[];
+  format?: string;
+  genre?: string;
+  year?: number;
+  status?: string;
+  revalidate?: number;
+}
+
+export async function browseAnime(
+  o: BrowseOpts = {}
+): Promise<{ items: Anime[]; hasNextPage: boolean }> {
+  const { text, variables } = buildListQuery({
+    sort: o.sort ?? ["POPULARITY_DESC"],
+    format: o.format,
+    genre: o.genre,
+    year: o.year,
+    status: o.status,
   });
-  return media.map(toAnime);
-}
-
-export async function getTopMovies(perPage = 8): Promise<Anime[]> {
-  const media = await query(
-    LIST_QUERY,
-    { perPage, sort: ["SCORE_DESC"], format: "MOVIE" },
-    86400 // 24h — movies barely move
+  const { media, hasNextPage } = await fetchPage(
+    text,
+    { page: o.page ?? 1, perPage: o.perPage ?? 18, ...variables },
+    o.revalidate ?? 3600
   );
-  return media.map(toAnime);
+  return { items: media.map(toAnime), hasNextPage };
 }
 
-export async function getSpotlight(perPage = 8): Promise<Anime[]> {
-  // High-score recent TV with banners for the cinematic reel
-  const media = await query(
-    LIST_QUERY,
-    { perPage: perPage + 6, sort: ["SCORE_DESC", "POPULARITY_DESC"] },
+export async function getTrending(perPage = 12): Promise<Anime[]> {
+  const { items } = await browseAnime(
+    {
+      perPage,
+      sort: ["TRENDING_DESC", "POPULARITY_DESC"],
+      revalidate: 1800, // 30 min — trending moves
+    }
+  );
+  return items;
+}
+
+export async function getTopMovies(perPage = 12): Promise<Anime[]> {
+  const { items } = await browseAnime(
+    { perPage, sort: ["SCORE_DESC"], format: "MOVIE", revalidate: 86400 }
+  );
+  return items;
+}
+
+export async function getSpotlight(perPage = 7): Promise<Anime[]> {
+  // High-score titles with banners for the cinematic reel
+  const { text, variables } = buildListQuery({
+    sort: ["SCORE_DESC", "POPULARITY_DESC"],
+  });
+  const { media } = await fetchPage(
+    text,
+    { page: 1, perPage: perPage + 6, ...variables },
     86400
   );
   const withBanners = media.filter((m) => m.bannerImage);
@@ -150,17 +234,64 @@ export async function getSpotlight(perPage = 8): Promise<Anime[]> {
     .map(toAnime);
 }
 
-const SEARCH_QUERY = `
-  query ($q: String, $perPage: Int) {
-    Page(perPage: $perPage) {
-      media(search: $q, type: ANIME, sort: POPULARITY_DESC, isAdult: false) {
-        ${MEDIA_FIELDS}
-      }
+export interface SearchOpts {
+  page?: number;
+  perPage?: number;
+  genre?: string;
+  format?: string;
+  sort?: string[];
+  year?: number;
+}
+
+export async function searchAnime(
+  q: string,
+  o: SearchOpts = {}
+): Promise<{ items: Anime[]; hasNextPage: boolean }> {
+  const { text, variables } = buildListQuery({
+    sort: o.sort ?? ["POPULARITY_DESC"],
+    genre: o.genre,
+    format: o.format,
+    year: o.year,
+    search: q || undefined,
+  });
+  const { media, hasNextPage } = await fetchPage(
+    text,
+    { page: o.page ?? 1, perPage: o.perPage ?? 18, ...variables },
+    600
+  );
+  return { items: media.map(toAnime), hasNextPage };
+}
+
+/** Full genre list for filter UI. Cached a week — it barely changes. */
+export async function getGenreCollection(): Promise<string[]> {
+  let lastErr: unknown = new Error("AniList unreachable");
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const res = await fetch(
+        ENDPOINT,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ query: "{ GenreCollection }" }),
+          signal: controller.signal,
+          next: { revalidate: 604800 },
+        } as RequestInit & { next: { revalidate: number } }
+      );
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`AniList ${res.status}`);
+      const json = await res.json();
+      const list = (json?.data?.GenreCollection ?? []) as string[];
+      return list.filter((g) => g !== "Hentai");
+    } catch (err) {
+      clearTimeout(timer);
+      lastErr = err;
+      await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
     }
   }
-`;
-
-export async function searchAnime(q: string, perPage = 12): Promise<Anime[]> {
-  const media = await query(SEARCH_QUERY, { q, perPage }, 600);
-  return media.map(toAnime);
+  throw lastErr;
 }

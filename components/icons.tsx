@@ -73,53 +73,39 @@ export function SearchIcon() {
   );
 }
 
-export function GithubIcon() {
+export function HomeIcon() {
   return (
-    <svg width={26} height={26} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.9 10.9c.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0C16.4 4.7 17.4 5 17.4 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.2c0 .3.2.6.8.5A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z" />
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 10.5L12 3l9 7.5" />
+      <path d="M5 9.5V21h14V9.5" />
     </svg>
   );
 }
 
-export function SectionIcon({ kind }: { kind: "trending" | "popular" | "movies" | "mal" }) {
-  const paths: Record<string, React.ReactNode> = {
-    trending: (
-      <>
-        <path d="M23 6l-9.5 9.5-5-5L1 18" />
-        <path d="M17 6h6v6" />
-      </>
-    ),
-    popular: (
-      <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
-    ),
-    movies: (
-      <>
-        <rect x="2" y="4" width="20" height="16" rx="2" />
-        <path d="M7 4v16M17 4v16M2 9h5M2 15h5M17 9h5M17 15h5" />
-      </>
-    ),
-    mal: (
-      <>
-        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-        <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-        <path d="M4 22h16" />
-        <path d="M10 14.7V17a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-2.3" />
-        <path d="M18 4H6v5a6 6 0 0 0 12 0V4z" />
-      </>
-    ),
-  };
+export function ReelIcon() {
   return (
-    <svg
-      className="head-icon"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {paths[kind]}
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="4" width="20" height="16" rx="3" />
+      <path d="M10 9l5 3-5 3z" />
+    </svg>
+  );
+}
+
+export function CompassIcon() {
+  return (
+    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M15.5 8.5l-2 5-5 2 2-5z" />
+    </svg>
+  );
+}
+
+export function SlidersIcon() {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
+      <path d="M4 8h10M18 8h2M4 16h4M12 16h8" />
+      <circle cx="16" cy="8" r="2.2" />
+      <circle cx="10" cy="16" r="2.2" />
     </svg>
   );
 }

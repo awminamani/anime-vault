@@ -4,6 +4,7 @@ export interface Anime {
   id: string; // "anilist:21" or "mal:21"
   source: "anilist" | "mal";
   title: string;
+  titleRomaji?: string;
   titleEnglish?: string;
   cover: string;
   banner?: string;
@@ -16,12 +17,4 @@ export interface Anime {
   trailerYoutubeId?: string;
   siteUrl: string;
   rank?: number; // MAL rank when from Jikan
-}
-
-export interface SectionData {
-  spotlight: Anime[];
-  trending: Anime[];
-  popular: Anime[];
-  movies: Anime[];
-  topMal: Anime[];
 }
