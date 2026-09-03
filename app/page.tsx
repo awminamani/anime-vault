@@ -1,4 +1,4 @@
-import { getSpotlight, getTrending, getTopMovies, getGenreCollection } from "@/lib/anilist";
+import { getTrending, getTopMovies, getGenreCollection } from "@/lib/anilist";
 import { getTopMal } from "@/lib/jikan";
 import Site from "@/components/Site";
 
@@ -6,8 +6,7 @@ import Site from "@/components/Site";
 export const revalidate = 1800;
 
 export default async function Page() {
-  const [spotlight, trending, movies, topMal, genres] = await Promise.all([
-    getSpotlight(7).catch(() => []),
+  const [trending, movies, topMal, genres] = await Promise.all([
     getTrending(12).catch(() => []),
     getTopMovies(12).catch(() => []),
     getTopMal(12), // never throws — returns [] on failure
@@ -15,12 +14,6 @@ export default async function Page() {
   ]);
 
   return (
-    <Site
-      spotlight={spotlight}
-      trending={trending}
-      movies={movies}
-      topMal={topMal}
-      genres={genres}
-    />
+    <Site trending={trending} movies={movies} topMal={topMal} genres={genres} />
   );
 }

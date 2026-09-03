@@ -16,7 +16,6 @@ import {
 } from "./icons";
 
 interface Props {
-  spotlight: Anime[];
   trending: Anime[];
   movies: Anime[];
   topMal: Anime[];
@@ -38,14 +37,19 @@ const SORTS = [
   { v: "TRENDING_DESC", l: "Trending" },
   { v: "TITLE_ENGLISH", l: "A–Z" },
 ];
+// Sorts supported by /api/browse (explore feed)
+const EXPLORE_SORTS = [
+  { v: "POPULARITY_DESC", l: "Popular" },
+  { v: "SCORE_DESC", l: "Top rated" },
+  { v: "TRENDING_DESC", l: "Trending" },
+  { v: "FAVOURITES_DESC", l: "Most loved" },
+];
 const FALLBACK_GENRES = [
   "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Horror",
   "Mystery", "Psychological", "Romance", "Sci-Fi", "Slice of Life",
   "Sports", "Supernatural", "Thriller",
 ];
 const QUICK_GENRES = ["Action", "Romance", "Fantasy", "Thriller", "Comedy", "Horror", "Sci-Fi", "Drama"];
-
-type View = "home" | "spotlight" | "browse";
 
 const activeCount = (f: Filters) => (f.genre ? 1 : 0) + (f.format ? 1 : 0) + (f.year ? 1 : 0);
 const wantsSearch = (q: string, f: Filters) =>
@@ -59,14 +63,14 @@ function qs(params: Record<string, string | number | undefined>): string {
   return sp.toString();
 }
 
-export default function Site({ spotlight, trending, movies, topMal, genres }: Props) {
-  const [view, setView] = useState<View>("home");
+export default function Site({ trending, movies, topMal, genres }: Props) {
   const [open, setOpen] = useState<Anime | null>(null);
 
   // ---- search (hero console) ----
   const [q, setQ] = useState("");
   const [filters, setFilters] = useState<Filters>(EMPTY_F);
   const [adv, setAdv] = useState(false);
+  const [allGenres, setAllGenres] = useState(false);
   const [results, setResults] = useState<Anime[]>([]);
   const [searchPage, setSearchPage] = useState(1);
   const [searchMore, setSearchMore] = useState(false);
@@ -132,70 +136,50 @@ export default function Site({ spotlight, trending, movies, topMal, genres }: Pr
     if (loadingMore || searching || !searchMore) return;
     runSearch(q, filters, searchPage + 1, true);
   }, [loadingMore, searching, searchMore, runSearch, q, filters, searchPage]);
-  const searchSentinel = useSentinel(loadMoreSearch, view === "home" && showResults && searchMore && !searching);
+  const searchSentinel = useSentinel(loadMoreSearch, showResults && searchMore && !searching);
 
-  // ---- browse (genre discovery, infinite) ----
-  const [bGenre, setBGenre] = useState("");
-  const [bSort, setBSort] = useState("POPULARITY_DESC");
-  const [bItems, setBItems] = useState<Anime[]>([]);
-  const [bPage, setBPage] = useState(1);
-  const [bMore, setBMore] = useState(true);
-  const [bLoading, setBLoading] = useState(false);
-  const [bFirst, setBFirst] = useState(true);
-  const browseSeq = useRef(0);
+  // ---- explore (single infinite feed, driven by the same genre state) ----
+  const [eSort, setESort] = useState("POPULARITY_DESC");
+  const [eItems, setEItems] = useState<Anime[]>([]);
+  const [ePage, setEPage] = useState(1);
+  const [eMore, setEMore] = useState(true);
+  const [eLoading, setELoading] = useState(false);
+  const [eFirst, setEFirst] = useState(true);
+  const exploreSeq = useRef(0);
 
-  const loadBrowse = useCallback(async (genre: string, sort: string, page: number, append: boolean) => {
-    const seq = ++browseSeq.current;
-    if (append) setBLoading(true);
-    else setBFirst(true);
+  const loadExplore = useCallback(async (genre: string, sort: string, page: number, append: boolean) => {
+    const seq = ++exploreSeq.current;
+    if (append) setELoading(true);
+    else setEFirst(true);
     try {
       const res = await fetch(`/api/browse?${qs({ page, genre: genre || undefined, sort })}`);
       const json = await res.json();
-      if (seq !== browseSeq.current) return;
-      setBItems((prev) => (append ? [...prev, ...(json.results ?? [])] : (json.results ?? [])));
-      setBPage(page);
-      setBMore(!!json.hasNextPage);
+      if (seq !== exploreSeq.current) return;
+      setEItems((prev) => (append ? [...prev, ...(json.results ?? [])] : (json.results ?? [])));
+      setEPage(page);
+      setEMore(!!json.hasNextPage);
     } catch {
-      if (seq !== browseSeq.current) return;
-      if (!append) setBItems([]);
-      setBMore(false);
+      if (seq !== exploreSeq.current) return;
+      if (!append) setEItems([]);
+      setEMore(false);
     } finally {
-      if (seq === browseSeq.current) {
-        setBLoading(false);
-        setBFirst(false);
+      if (seq === exploreSeq.current) {
+        setELoading(false);
+        setEFirst(false);
       }
     }
   }, []);
 
+  // One feed: reload whenever the shared genre or explore sort changes.
   useEffect(() => {
-    if (view === "browse") loadBrowse(bGenre, bSort, 1, false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
+    loadExplore(filters.genre, eSort, 1, false);
+  }, [filters.genre, eSort, loadExplore]);
 
-  const pickGenre = (g: string) => {
-    setBGenre(g);
-    loadBrowse(g, bSort, 1, false);
-  };
-  const pickSort = (s: string) => {
-    setBSort(s);
-    loadBrowse(bGenre, s, 1, false);
-  };
-  const loadMoreBrowse = useCallback(() => {
-    if (bLoading || bFirst || !bMore) return;
-    loadBrowse(bGenre, bSort, bPage + 1, true);
-  }, [bLoading, bFirst, bMore, loadBrowse, bGenre, bSort, bPage]);
-  const browseSentinel = useSentinel(loadMoreBrowse, view === "browse" && bMore && !bFirst);
-
-  // ---- view switching ----
-  const go = (v: View) => {
-    setView(v);
-    window.scrollTo({ top: 0 });
-  };
-  const genreToBrowse = (g: string) => {
-    setBGenre(g);
-    go("browse");
-    loadBrowse(g, bSort, 1, false);
-  };
+  const loadMoreExplore = useCallback(() => {
+    if (eLoading || eFirst || !eMore) return;
+    loadExplore(filters.genre, eSort, ePage + 1, true);
+  }, [eLoading, eFirst, eMore, loadExplore, filters.genre, eSort, ePage]);
+  const exploreSentinel = useSentinel(loadMoreExplore, eMore && !eFirst);
 
   // ---- cursor glow (fine pointers only) ----
   useEffect(() => {
@@ -212,24 +196,28 @@ export default function Site({ spotlight, trending, movies, topMal, genres }: Pr
     return () => window.removeEventListener("mousemove", move);
   }, []);
 
-  // ---- spotlight horizontal distance (real px from layout) ----
+  // ---- reveal-on-scroll (transform only — never leaves cards half-faded) ----
   useEffect(() => {
-    if (view !== "spotlight") return;
-    const track = document.getElementById("htrack");
-    if (!track) return;
-    const set = () =>
-      track.style.setProperty(
-        "--maxx",
-        `${Math.max(0, track.scrollWidth - window.innerWidth + 64)}px`
-      );
-    set();
-    window.addEventListener("resize", set);
-    const t = setTimeout(set, 1200);
-    return () => {
-      window.removeEventListener("resize", set);
-      clearTimeout(t);
-    };
-  }, [view, spotlight]);
+    const els = document.querySelectorAll(".reveal:not(.in)");
+    if (els.length === 0) return;
+    if (!("IntersectionObserver" in window)) {
+      els.forEach((el) => el.classList.add("in"));
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            e.target.classList.add("in");
+            io.unobserve(e.target);
+          }
+        }
+      },
+      { threshold: 0.12 }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [trending.length, movies.length, topMal.length, showResults]);
 
   // ---- lock scroll when sheet open ----
   useEffect(() => {
@@ -237,7 +225,7 @@ export default function Site({ spotlight, trending, movies, topMal, genres }: Pr
     return () => {
       document.body.style.overflow = "";
     };
-  }, [adv ]);
+  }, [adv]);
 
   useEffect(() => {
     if (!adv) return;
@@ -247,31 +235,29 @@ export default function Site({ spotlight, trending, movies, topMal, genres }: Pr
   }, [adv]);
 
   const genreList = genres.length > 0 ? genres : FALLBACK_GENRES;
-  const featured = spotlight[0];
-  const banner = spotlight.find((s) => s.banner) ?? featured;
+  // Rotating hero banners — varied artwork, never one image on loop.
+  const heroBanners = [...trending, ...movies]
+    .map((a) => a.banner)
+    .filter((b): b is string => !!b)
+    .filter((b, i, arr) => arr.indexOf(b) === i)
+    .slice(0, 6);
 
   return (
     <>
-      <div className="progress" aria-hidden="true" />
       <div className="cursor-glow" id="cursorGlow" aria-hidden="true" />
 
       <header className="nav">
-        <button className="brand" onClick={() => go("home")} aria-label="AnimeVault home">
+        <a className="brand" href="#top" aria-label="AnimeVault home">
           <LogoMark />
           <span>
             Anime<b>Vault</b>
           </span>
-        </button>
-        <nav className="tabs" aria-label="Views">
-          <button className={view === "home" ? "tab on" : "tab"} onClick={() => go("home")}>
-            <HomeIcon /> Discover
-          </button>
-          <button className={view === "spotlight" ? "tab on" : "tab"} onClick={() => go("spotlight")}>
-            <ReelIcon /> Spotlight
-          </button>
-          <button className={view === "browse" ? "tab on" : "tab"} onClick={() => go("browse")}>
-            <CompassIcon /> Browse
-          </button>
+        </a>
+        <nav className="anchors" aria-label="Sections">
+          <a href="#trending">Trending</a>
+          <a href="#movies">Movies</a>
+          <a href="#legends">Legends</a>
+          <a href="#explore">Explore</a>
         </nav>
         <a
           className="ghlink"
@@ -285,283 +271,254 @@ export default function Site({ spotlight, trending, movies, topMal, genres }: Pr
         </a>
       </header>
 
-      {view === "home" && (
-        <main id="top">
-          {/* SEARCH CONSOLE */}
-          <section className="console">
-            <Starfield />
-            {featured?.banner && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={featured.id} className="console-bg" src={featured.banner} alt="" />
-            )}
-            <div className="console-veil" aria-hidden="true" />
-            <div className="console-inner">
-              <p className="console-kicker">What are you in the mood for?</p>
-              <div className="searchbar">
-                <SearchIcon />
-                <input
-                  type="search"
-                  placeholder="Search anime… try “frieren”"
-                  autoComplete="off"
-                  aria-label="Search anime"
-                  value={q}
-                  onChange={(e) => onType(e.target.value)}
-                />
-                <button
-                  className={activeCount(filters) > 0 ? "advbtn has" : "advbtn"}
-                  onClick={() => setAdv(true)}
-                  aria-label="Advanced search"
-                >
-                  <SlidersIcon />
-                  {activeCount(filters) > 0 && <span className="count">{activeCount(filters)}</span>}
-                </button>
-              </div>
-              <div className="quickchips">
-                {QUICK_GENRES.map((g) => (
-                  <button
-                    key={g}
-                    className={filters.genre === g ? "qchip on" : "qchip"}
-                    onClick={() =>
-                      applyFilters({ ...filters, genre: filters.genre === g ? "" : g })
-                    }
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* SEARCH RESULTS */}
-          {showResults && (
-            <section className="section slim" id="results">
-              <div className="results-meta">
-                <h2>{searching && results.length === 0 ? "Searching…" : `${results.length}${searchMore ? "+" : ""} found`}</h2>
-                {(q.trim() || activeCount(filters) > 0) && (
-                  <button
-                    className="clearbtn"
-                    onClick={() => {
-                      setQ("");
-                      setFilters(EMPTY_F);
-                      setResults([]);
-                      setSearchMore(false);
-                    }}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              {(activeCount(filters) > 0 || filters.sort !== "POPULARITY_DESC") && (
-                <div className="actives">
-                  {filters.genre && (
-                    <button className="apill" onClick={() => applyFilters({ ...filters, genre: "" })}>
-                      {filters.genre} ✕
-                    </button>
-                  )}
-                  {filters.format && (
-                    <button className="apill" onClick={() => applyFilters({ ...filters, format: "" })}>
-                      {filters.format} ✕
-                    </button>
-                  )}
-                  {filters.year && (
-                    <button className="apill" onClick={() => applyFilters({ ...filters, year: "" })}>
-                      {filters.year} ✕
-                    </button>
-                  )}
-                </div>
-              )}
-              <div className="grid">
-                {searching && results.length === 0 ? (
-                  <SkeletonGrid count={12} />
-                ) : (
-                  results.map((a) => <AnimeCard key={a.id} anime={a} onOpen={setOpen} />)
-                )}
-              </div>
-              {loadingMore && (
-                <div className="grid" style={{ marginTop: 20 }}>
-                  <SkeletonGrid count={8} />
-                </div>
-              )}
-              {!searching && !loadingMore && results.length === 0 && (
-                <p className="empty">Nothing found — try another title or loosen the filters.</p>
-              )}
-              {!searchMore && results.length > 0 && <p className="endmark">— end —</p>}
-              <div ref={searchSentinel} className="sentinel" aria-hidden="true" />
-            </section>
-          )}
-
-          {/* GENRES */}
-          <section className="section slim">
-            <div className="sechead reveal">
-              <h2>Browse by genre</h2>
-            </div>
-            <div className="genrecloud reveal">
-              {genreList.map((g) => (
-                <button key={g} className="gchip" onClick={() => genreToBrowse(g)}>
-                  {g}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          {/* TRENDING */}
-          <section className="section slim">
-            <div className="sechead reveal">
-              <h2>Trending now</h2>
-            </div>
-            <div className="rail">
-              {trending.length === 0 ? (
-                <SkeletonRail count={6} />
-              ) : (
-                trending.map((a, i) => (
-                  <AnimeCard key={a.id} anime={a} rank={i + 1} onOpen={setOpen} />
-                ))
-              )}
-            </div>
-          </section>
-
-          {/* PARALLAX BREATHER */}
-          {banner?.banner && (
-            <section className="banner thin" aria-hidden="true">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={banner.banner} alt="" loading="lazy" />
-              <div className="banner-veil" />
-            </section>
-          )}
-
-          {/* MOVIES */}
-          <section className="section slim">
-            <div className="sechead reveal">
-              <h2>Top movies</h2>
-            </div>
-            <div className="rail">
-              {movies.length === 0 ? (
-                <SkeletonRail count={6} />
-              ) : (
-                movies.map((a, i) => (
-                  <AnimeCard key={a.id} anime={a} rank={i + 1} onOpen={setOpen} />
-                ))
-              )}
-            </div>
-          </section>
-
-          {/* MAL */}
-          {topMal.length > 0 && (
-            <section className="section slim">
-              <div className="sechead reveal">
-                <h2>Legends of MAL</h2>
-              </div>
-              <div className="rail">
-                {topMal.map((a, i) => (
-                  <AnimeCard key={a.id} anime={a} rank={i + 1} onOpen={setOpen} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          <footer className="footer slimfoot">
-            <p>
-              Data · <a href="https://anilist.co" rel="noopener">AniList</a> +{" "}
-              <a href="https://jikan.moe" rel="noopener">Jikan</a>
-            </p>
-          </footer>
-        </main>
-      )}
-
-      {view === "spotlight" && (
-        <main className="spotview">
-          <div className="hwrap">
-            <div className="hstage">
-              <div className="htrack" id="htrack">
-                {spotlight.map((a, i) => (
-                  <article key={a.id} className="spot" onClick={() => setOpen(a)}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img className="bg" src={a.banner || a.cover} alt="" loading="lazy" />
-                    <div className="spot-veil" />
-                    <span className="spot-num">{String(i + 1).padStart(2, "0")}</span>
-                    <div className="spot-info">
-                      <h3>{a.title}</h3>
-                      <p>{a.synopsis}</p>
-                      <div className="spot-tags">
-                        {a.genres.map((g) => (
-                          <span key={g} className="chip">
-                            {g}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </div>
+      <main id="top">
+        {/* SEARCH CONSOLE */}
+        <section className="console">
+          <Starfield />
+          <HeroBg banners={heroBanners} />
+          <div className="orbs" aria-hidden="true">
+            <span className="orb orb-a" />
+            <span className="orb orb-b" />
           </div>
-          <p className="spot-hint">Scroll down — the reel moves sideways</p>
-        </main>
-      )}
-
-      {view === "browse" && (
-        <main className="browsewrap">
-          <div className="browserbar">
-            <div className="sortpills">
-              {SORTS.map((s) => (
-                <button
-                  key={s.v}
-                  className={bSort === s.v ? "spill on" : "spill"}
-                  onClick={() => pickSort(s.v)}
-                >
-                  {s.l}
-                </button>
-              ))}
-            </div>
-            <div className="genrerail">
-              <button className={!bGenre ? "gchip sm on" : "gchip sm"} onClick={() => pickGenre("")}>
-                All
+          <div className="console-veil" aria-hidden="true" />
+          <div className="console-inner">
+            <p className="console-kicker">What are you in the mood for?</p>
+            <div className="searchbar">
+              <SearchIcon />
+              <input
+                type="search"
+                placeholder="Search anime… try “frieren”"
+                autoComplete="off"
+                aria-label="Search anime"
+                value={q}
+                onChange={(e) => onType(e.target.value)}
+              />
+              <button
+                className={activeCount(filters) > 0 ? "advbtn has" : "advbtn"}
+                onClick={() => setAdv(true)}
+                aria-label="Advanced search"
+              >
+                <SlidersIcon />
+                {activeCount(filters) > 0 && <span className="count">{activeCount(filters)}</span>}
               </button>
-              {genreList.map((g) => (
+            </div>
+            <div className="quickchips">
+              {QUICK_GENRES.map((g) => (
                 <button
                   key={g}
-                  className={bGenre === g ? "gchip sm on" : "gchip sm"}
-                  onClick={() => pickGenre(g)}
+                  className={filters.genre === g ? "qchip on" : "qchip"}
+                  onClick={() =>
+                    applyFilters({ ...filters, genre: filters.genre === g ? "" : g })
+                  }
                 >
                   {g}
                 </button>
               ))}
+              <button
+                className={allGenres ? "qchip more on" : "qchip more"}
+                onClick={() => setAllGenres((v) => !v)}
+                aria-expanded={allGenres}
+              >
+                {allGenres ? "Less ✕" : "All genres ▾"}
+              </button>
             </div>
+            {allGenres && (
+              <div className="genrecloud full">
+                {genreList
+                  .filter((g) => !QUICK_GENRES.includes(g))
+                  .map((g) => (
+                    <button
+                      key={g}
+                      className={filters.genre === g ? "gchip sm on" : "gchip sm"}
+                      onClick={() =>
+                        applyFilters({ ...filters, genre: filters.genre === g ? "" : g })
+                      }
+                    >
+                      {g}
+                    </button>
+                  ))}
+              </div>
+            )}
           </div>
-          <section className="section slim">
-            <div className="grid">
-              {bFirst ? (
-                <SkeletonGrid count={12} />
-              ) : (
-                bItems.map((a) => <AnimeCard key={a.id} anime={a} onOpen={setOpen} />)
+        </section>
+
+        {/* SEARCH RESULTS */}
+        {showResults && (
+          <section className="section slim" id="results">
+            <div className="results-meta">
+              <h2>{searching && results.length === 0 ? "Searching…" : `${results.length}${searchMore ? "+" : ""} found`}</h2>
+              {(q.trim() || activeCount(filters) > 0) && (
+                <button
+                  className="clearbtn"
+                  onClick={() => {
+                    setQ("");
+                    setFilters(EMPTY_F);
+                    setResults([]);
+                    setSearchMore(false);
+                  }}
+                >
+                  Clear
+                </button>
               )}
             </div>
-            {bLoading && (
+            {(activeCount(filters) > 0 || filters.sort !== "POPULARITY_DESC") && (
+              <div className="actives">
+                {filters.genre && (
+                  <button className="apill" onClick={() => applyFilters({ ...filters, genre: "" })}>
+                    {filters.genre} ✕
+                  </button>
+                )}
+                {filters.format && (
+                  <button className="apill" onClick={() => applyFilters({ ...filters, format: "" })}>
+                    {filters.format} ✕
+                  </button>
+                )}
+                {filters.year && (
+                  <button className="apill" onClick={() => applyFilters({ ...filters, year: "" })}>
+                    {filters.year} ✕
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="grid">
+              {searching && results.length === 0 ? (
+                <SkeletonGrid count={12} />
+              ) : (
+                results.map((a) => <AnimeCard key={a.id} anime={a} onOpen={setOpen} />)
+              )}
+            </div>
+            {loadingMore && (
               <div className="grid" style={{ marginTop: 20 }}>
                 <SkeletonGrid count={8} />
               </div>
             )}
-            {!bFirst && bItems.length === 0 && <p className="empty">Nothing here yet.</p>}
-            {!bMore && bItems.length > 0 && <p className="endmark">— end —</p>}
-            <div ref={browseSentinel} className="sentinel" aria-hidden="true" />
+            {!searching && !loadingMore && results.length === 0 && (
+              <p className="empty">Nothing found — try another title or loosen the filters.</p>
+            )}
+            {!searchMore && results.length > 0 && <p className="endmark">— end —</p>}
+            <div ref={searchSentinel} className="sentinel" aria-hidden="true" />
           </section>
-        </main>
-      )}
+        )}
 
-      {/* mobile bottom nav */}
-      <nav className="bottomnav" aria-label="Views">
-        <button className={view === "home" ? "bnav on" : "bnav"} onClick={() => go("home")}>
+        {/* TRENDING */}
+        <section className="section slim" id="trending">
+          <div className="sechead reveal">
+            <h2>Trending now</h2>
+            <p className="muted">What everyone is watching this season.</p>
+          </div>
+          <div className="rail">
+            {trending.length === 0 ? (
+              <SkeletonRail count={6} />
+            ) : (
+              trending.map((a, i) => (
+                <AnimeCard key={a.id} anime={a} rank={i + 1} onOpen={setOpen} />
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* AURORA DIVIDER — pure CSS, alive without reusing artwork */}
+        <div className="aurora" aria-hidden="true">
+          <span className="aurora-a" />
+          <span className="aurora-b" />
+          <span className="aurora-line" />
+        </div>
+
+        {/* MOVIES */}
+        <section className="section slim" id="movies">
+          <div className="sechead reveal">
+            <h2>Top movies</h2>
+            <p className="muted">Big-screen stories worth your evening.</p>
+          </div>
+          <div className="rail">
+            {movies.length === 0 ? (
+              <SkeletonRail count={6} />
+            ) : (
+              movies.map((a, i) => (
+                <AnimeCard key={a.id} anime={a} rank={i + 1} onOpen={setOpen} />
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* MAL */}
+        {topMal.length > 0 && (
+          <section className="section slim" id="legends">
+            <div className="sechead reveal">
+              <h2>Legends of MAL</h2>
+              <p className="muted">The highest-rated anime of all time.</p>
+            </div>
+            <div className="rail">
+              {topMal.map((a, i) => (
+                <AnimeCard key={a.id} anime={a} rank={i + 1} onOpen={setOpen} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* EXPLORE — the one infinite feed */}
+        <section className="section slim" id="explore">
+          <div className="sechead reveal">
+            <h2>Explore{filters.genre ? ` · ${filters.genre}` : ""}</h2>
+            <p className="muted">
+              The endless catalogue{filters.genre ? " — filtered by your genre pick above" : ""}.
+              {filters.genre && (
+                <>
+                  {" "}
+                  <button className="linkbtn" onClick={() => applyFilters({ ...filters, genre: "" })}>
+                    Clear ✕
+                  </button>
+                </>
+              )}
+            </p>
+          </div>
+          <div className="sortpills">
+            {EXPLORE_SORTS.map((s) => (
+              <button
+                key={s.v}
+                className={eSort === s.v ? "spill on" : "spill"}
+                onClick={() => setESort(s.v)}
+              >
+                {s.l}
+              </button>
+            ))}
+          </div>
+          <div className="grid feed">
+            {eFirst ? (
+              <SkeletonGrid count={12} />
+            ) : (
+              eItems.map((a) => <AnimeCard key={a.id} anime={a} onOpen={setOpen} />)
+            )}
+          </div>
+          {eLoading && (
+            <div className="grid feed" style={{ marginTop: 20 }}>
+              <SkeletonGrid count={8} />
+            </div>
+          )}
+          {!eFirst && eItems.length === 0 && <p className="empty">Nothing here yet.</p>}
+          {!eMore && eItems.length > 0 && <p className="endmark">— end —</p>}
+          <div ref={exploreSentinel} className="sentinel" aria-hidden="true" />
+        </section>
+      </main>
+
+      {/* mobile bottom nav — anchor jumps on the single page */}
+      <nav className="bottomnav" aria-label="Sections">
+        <a className="bnav" href="#top">
+          <SearchIcon />
+          <span>Search</span>
+        </a>
+        <a className="bnav" href="#trending">
           <HomeIcon />
-          <span>Discover</span>
-        </button>
-        <button className={view === "spotlight" ? "bnav on" : "bnav"} onClick={() => go("spotlight")}>
+          <span>Trending</span>
+        </a>
+        <a className="bnav" href="#movies">
           <ReelIcon />
-          <span>Spotlight</span>
-        </button>
-        <button className={view === "browse" ? "bnav on" : "bnav"} onClick={() => go("browse")}>
+          <span>Movies</span>
+        </a>
+        <a className="bnav" href="#explore">
           <CompassIcon />
-          <span>Browse</span>
-        </button>
+          <span>Explore</span>
+        </a>
       </nav>
 
       {/* ADVANCED SHEET */}
@@ -577,6 +534,31 @@ export default function Site({ spotlight, trending, movies, topMal, genres }: Pr
       )}
 
       <DetailModal anime={open} onClose={() => setOpen(null)} />
+    </>
+  );
+}
+
+/** Rotating hero backdrop — crossfades through varied banners, never one image on loop. */
+function HeroBg({ banners }: { banners: string[] }) {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    if (banners.length < 2) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % banners.length), 7000);
+    return () => clearInterval(t);
+  }, [banners.length]);
+  if (banners.length === 0) return null;
+  return (
+    <>
+      {banners.map((b, i) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={`${b}-${i}`}
+          src={b}
+          alt=""
+          aria-hidden="true"
+          className={i === idx ? "console-bgimg on" : "console-bgimg"}
+        />
+      ))}
     </>
   );
 }
