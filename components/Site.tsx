@@ -42,9 +42,10 @@ const EXPLORE_SORTS = [
   { v: "FAVOURITES_DESC", l: "Most loved" },
 ];
 const FALLBACK_GENRES = [
-  "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Horror",
-  "Mystery", "Psychological", "Romance", "Sci-Fi", "Slice of Life",
-  "Sports", "Supernatural", "Thriller",
+  "Action", "Adventure", "Comedy", "Drama", "Ecchi", "Fantasy",
+  "Horror", "Mahou Shoujo", "Mecha", "Music", "Mystery",
+  "Psychological", "Romance", "Sci-Fi", "Slice of Life", "Sports",
+  "Supernatural", "Thriller",
 ];
 const QUICK_GENRES = ["Action", "Romance", "Fantasy", "Thriller", "Comedy", "Horror", "Sci-Fi", "Drama"];
 
@@ -231,6 +232,15 @@ export default function Site({ trending, genres }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [adv]);
 
+  // ---- nav: transparent over the hero (seamless), glass once scrolled ----
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   const genreList = genres.length > 0 ? genres : FALLBACK_GENRES;
   // Rotating hero banners — varied artwork, never one image on loop.
   const heroBanners = trending
@@ -243,7 +253,7 @@ export default function Site({ trending, genres }: Props) {
     <>
       <div className="cursor-glow" id="cursorGlow" aria-hidden="true" />
 
-      <header className="nav">
+      <header className={scrolled ? "nav scrolled" : "nav"}>
         <a className="brand" href="#top" aria-label="AnimeVault home">
           <LogoMark />
           <span>
@@ -399,7 +409,6 @@ export default function Site({ trending, genres }: Props) {
         <section className="section slim" id="trending">
           <div className="sechead reveal">
             <h2>Trending now</h2>
-            <p className="muted">What everyone is watching this season.</p>
           </div>
           <div className="rail">
             {trending.length === 0 ? (
@@ -414,19 +423,13 @@ export default function Site({ trending, genres }: Props) {
 
         {/* EXPLORE — the one infinite feed */}
         <section className="section slim" id="explore">
-          <div className="sechead reveal">
+          <div className="sechead explore-head reveal">
             <h2>Explore{filters.genre ? ` · ${filters.genre}` : ""}</h2>
-            <p className="muted">
-              The endless catalogue{filters.genre ? " — filtered by your genre pick above" : ""}.
-              {filters.genre && (
-                <>
-                  {" "}
-                  <button className="linkbtn" onClick={() => applyFilters({ ...filters, genre: "" })}>
-                    Clear ✕
-                  </button>
-                </>
-              )}
-            </p>
+            {filters.genre && (
+              <button className="clearbtn" onClick={() => applyFilters({ ...filters, genre: "" })}>
+                Clear ✕
+              </button>
+            )}
           </div>
           <div className="sortpills">
             {EXPLORE_SORTS.map((s) => (
