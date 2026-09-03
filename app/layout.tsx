@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "AnimeVault — Discover Your Next Obsession",
   description:
-    "Trending anime, top movies, trailers in one click. A vault of 20,000+ anime powered by AniList + Jikan. No sign-up, no key.",
+    "Trending anime, trailers in one click. A vault of 20,000+ anime powered by AniList. No sign-up, no key.",
 };
 
 export default function RootLayout({

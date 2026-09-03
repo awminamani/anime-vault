@@ -10,15 +10,12 @@ import {
   CompassIcon,
   HomeIcon,
   LogoMark,
-  ReelIcon,
   SearchIcon,
   SlidersIcon,
 } from "./icons";
 
 interface Props {
   trending: Anime[];
-  movies: Anime[];
-  topMal: Anime[];
   genres: string[];
 }
 
@@ -63,7 +60,7 @@ function qs(params: Record<string, string | number | undefined>): string {
   return sp.toString();
 }
 
-export default function Site({ trending, movies, topMal, genres }: Props) {
+export default function Site({ trending, genres }: Props) {
   const [open, setOpen] = useState<Anime | null>(null);
 
   // ---- search (hero console) ----
@@ -217,7 +214,7 @@ export default function Site({ trending, movies, topMal, genres }: Props) {
     );
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
-  }, [trending.length, movies.length, topMal.length, showResults]);
+  }, [trending.length, showResults]);
 
   // ---- lock scroll when sheet open ----
   useEffect(() => {
@@ -236,7 +233,7 @@ export default function Site({ trending, movies, topMal, genres }: Props) {
 
   const genreList = genres.length > 0 ? genres : FALLBACK_GENRES;
   // Rotating hero banners — varied artwork, never one image on loop.
-  const heroBanners = [...trending, ...movies]
+  const heroBanners = trending
     .map((a) => a.banner)
     .filter((b): b is string => !!b)
     .filter((b, i, arr) => arr.indexOf(b) === i)
@@ -255,8 +252,6 @@ export default function Site({ trending, movies, topMal, genres }: Props) {
         </a>
         <nav className="anchors" aria-label="Sections">
           <a href="#trending">Trending</a>
-          <a href="#movies">Movies</a>
-          <a href="#legends">Legends</a>
           <a href="#explore">Explore</a>
         </nav>
         <a
@@ -417,45 +412,6 @@ export default function Site({ trending, movies, topMal, genres }: Props) {
           </div>
         </section>
 
-        {/* AURORA DIVIDER — pure CSS, alive without reusing artwork */}
-        <div className="aurora" aria-hidden="true">
-          <span className="aurora-a" />
-          <span className="aurora-b" />
-          <span className="aurora-line" />
-        </div>
-
-        {/* MOVIES */}
-        <section className="section slim" id="movies">
-          <div className="sechead reveal">
-            <h2>Top movies</h2>
-            <p className="muted">Big-screen stories worth your evening.</p>
-          </div>
-          <div className="rail">
-            {movies.length === 0 ? (
-              <SkeletonRail count={6} />
-            ) : (
-              movies.map((a, i) => (
-                <AnimeCard key={a.id} anime={a} rank={i + 1} onOpen={setOpen} />
-              ))
-            )}
-          </div>
-        </section>
-
-        {/* MAL */}
-        {topMal.length > 0 && (
-          <section className="section slim" id="legends">
-            <div className="sechead reveal">
-              <h2>Legends of MAL</h2>
-              <p className="muted">The highest-rated anime of all time.</p>
-            </div>
-            <div className="rail">
-              {topMal.map((a, i) => (
-                <AnimeCard key={a.id} anime={a} rank={i + 1} onOpen={setOpen} />
-              ))}
-            </div>
-          </section>
-        )}
-
         {/* EXPLORE — the one infinite feed */}
         <section className="section slim" id="explore">
           <div className="sechead reveal">
@@ -510,10 +466,6 @@ export default function Site({ trending, movies, topMal, genres }: Props) {
         <a className="bnav" href="#trending">
           <HomeIcon />
           <span>Trending</span>
-        </a>
-        <a className="bnav" href="#movies">
-          <ReelIcon />
-          <span>Movies</span>
         </a>
         <a className="bnav" href="#explore">
           <CompassIcon />
